@@ -1,0 +1,312 @@
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOVA Ring</title>
+<meta property="og:title" content="NOVA Ring: After The Music">
+<meta property="og:description" content="12 ft aluminum ring, four removable quarters, LED on the underside and outer edge">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@500;700&display=swap">
+<style>
+  :root{--paper:#f3f6f9;--text:#1c2733;--muted:#5b6b7a;--ink:#1b2f86;--line:#d5dde5;color-scheme:light}
+  html,body{background:var(--paper);color:var(--text);margin:0}
+  body{font-family:"Assistant",system-ui,sans-serif;padding:20px 16px 40px}
+  .wrap{max-width:960px;margin:0 auto;display:grid;gap:16px}
+  h1{margin:0;font:700 24px/1.2 "Assistant",sans-serif}
+  .sub{margin:4px 0 0;color:var(--muted);font-size:15px}
+  #view{position:relative;height:min(68vh,560px);border-radius:12px;overflow:hidden;background:#20262e;touch-action:none}
+  #view canvas{display:block;width:100%;height:100%}
+  #cap{margin:0;font:700 19px/1.35 "Assistant",sans-serif;min-height:2.7em}
+  .nav{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+  .nav button{font-size:18px;padding:12px 18px}
+  #count{text-align:center;color:var(--muted);font:700 15px "Assistant",sans-serif}
+  .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--ink);transition:width .4s}
+  @media (max-width:700px){
+    body{padding:12px 12px 28px}
+    h1{font-size:20px}
+    .sub{font-size:15px}
+    #view{height:52vh}
+    .steps,.leds{display:none!important}
+    .facts{grid-template-columns:1fr 1fr}
+    .fact b{font-size:16px}
+  }
+  .steps{display:flex;flex-wrap:wrap;gap:8px}
+  button{font:700 15px "Assistant",sans-serif;border:1px solid var(--line);background:#fff;color:var(--text);
+    padding:9px 14px;border-radius:999px;cursor:pointer}
+  button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  button.play{background:#e8784a;color:#fff;border-color:#e8784a}
+  .leds{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:15px}
+  .chip{width:30px;height:30px;padding:0;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--line)}
+  .chip.on{box-shadow:0 0 0 2px var(--ink)}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .fact{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .fact b{display:block;font-size:19px}
+  .fact span{color:var(--muted);font-size:14px}
+  .note{color:var(--muted);font-size:13px;margin:0}
+</style></head><body>
+<div class="wrap">
+  <div>
+    <h1>NOVA Ring: After The Music</h1>
+    <p class="sub">A 12 ft aluminum ring built from four removable 90° sections, hung from four points, with LED tape on the underside and the outer edge. Tap <b>Next</b> to go step by step; drag the picture to look around.</p>
+  </div>
+  <div id="view"></div>
+  <div class="bar"><i id="prog"></i></div>
+  <p id="cap"></p>
+  <div class="nav"><button id="prev" aria-label="Previous">&#8592; Back</button><div id="count"></div><button id="next" class="play">Next &#8594;</button></div>
+  <div class="steps" id="steps"></div>
+  <div class="leds">LED colour:<span id="chips" style="display:flex;gap:8px"></span></div>
+  <div class="facts">
+    <div class="fact"><b>12'-0" (366 cm)</b><span>Outside diameter</span></div>
+    <div class="fact"><b>11'-4" (345 cm)</b><span>Inside diameter</span></div>
+    <div class="fact"><b>4" × 1/2"</b><span>Radial band width × thickness</span></div>
+    <div class="fact"><b>4 × 90°</b><span>Removable sections, each 6'×6', 9'-5" outer arc</span></div>
+    <div class="fact"><b>4 points</b><span>Suspension, one mid-section on each quarter</span></div>
+    <div class="fact"><b>LED</b><span>Underside (downlight) + outer edge</span></div>
+  </div>
+  <p class="note">Illustration only, not a fabrication drawing. Alloy, joints, final thickness and rigging to be approved by a qualified fabricator and the venue rigger.</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+  // Real dimensions in metres (1" = 0.0254 m). Thickness is drawn 1.6x so it reads on a phone.
+  const IN = 0.0254, RO = 72 * IN, RI = 68 * IN, TH = 0.5 * IN * 1.6, HANG_Y = 3.6, TRUSS_Y = 6.2;
+
+  // What each step looks like: stack (quarters stacked for transport), asm (assembled),
+  // lift (0 = on the floor, 1 = hung), led (0 = off, 1 = on).
+  const STEPS = [
+    {name:'1. Packed', cap:'Four quarters stacked for transport, each 6 × 6 ft', s:{stack:1, asm:0, lift:0, led:0}},
+    {name:'2. Lay out', cap:'The four quarters laid out on the floor', s:{stack:0, asm:0, lift:0, led:0}},
+    {name:'3. Assemble', cap:'Quarters joined into a true circle: four removable mechanical joints', s:{stack:0, asm:1, lift:0, led:0}},
+    {name:'4. Hoist', cap:'Hoisted on four suspension points, one in the middle of each quarter', s:{stack:0, asm:1, lift:1, led:0}},
+    {name:'5. Lights on', cap:'LED on: downlight from the underside and a glowing outer edge', s:{stack:0, asm:1, lift:1, led:1}},
+    {name:'6. Strike', cap:'Lowered, taken apart into quarters and packed again', s:{stack:1, asm:0, lift:0, led:0}, strike:true}
+  ];
+  const COLORS = ['#ffffff', '#ffc27a', '#4aa8ff', '#ff4fa8', '#9b6bff'];
+
+  const view = document.getElementById('view'), cap = document.getElementById('cap');
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  view.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#2a323c');
+  scene.fog = new THREE.Fog('#2a323c', 14, 30);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(5.2, 7.4, 6.4);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1.6, 0);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 3; controls.maxDistance = 24;
+  controls.autoRotate = true; controls.autoRotateSpeed = 0.6;
+
+  const hemi = new THREE.HemisphereLight('#dfe8f2', '#3a3f46', 0.9);
+  const sun = new THREE.DirectionalLight('#ffffff', 0.8);
+  sun.position.set(4, 8, 5);
+  scene.add(hemi, sun);
+
+  // floor
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(16, 64), new THREE.MeshStandardMaterial({color:'#4b525b', roughness:.9}));
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  // one 90-degree quarter of the flat band, lying flat
+  const alu = new THREE.MeshStandardMaterial({color:'#d3d8de', metalness:.35, roughness:.35, emissive:'#2a2e33'});
+  function quarterGeom() {
+    const s = new THREE.Shape();
+    s.absarc(0, 0, RO, 0, Math.PI / 2, false);
+    s.absarc(0, 0, RI, Math.PI / 2, 0, true);
+    const g = new THREE.ExtrudeGeometry(s, {depth:TH, bevelEnabled:false, curveSegments:48});
+    g.rotateX(-Math.PI / 2);            // lie flat; covers angle 0..90 in the x/-z quadrant
+    return g;
+  }
+  const qGeom = quarterGeom();
+  const quarters = [0, 1, 2, 3].map(q => {
+    const m = new THREE.Mesh(qGeom, alu);
+    scene.add(m);
+    return m;
+  });
+
+  // joints between quarters (plates over each seam)
+  const joints = new THREE.Group();
+  const plateMat = new THREE.MeshStandardMaterial({color:'#7d858f', metalness:.7, roughness:.4, transparent:true});
+  for (let k = 0; k < 4; k++) {
+    const a = k * Math.PI / 2, r = (RO + RI) / 2;
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.16, TH * 1.2, 0.13), plateMat);
+    p.position.set(Math.cos(a) * r, TH * 1.1, -Math.sin(a) * r);
+    p.rotation.y = a;
+    joints.add(p);
+  }
+  scene.add(joints);
+
+  // LED: outer edge strip, underside strip, soft halo and the pool of light on the floor
+  const led = new THREE.Group();
+  const ledMat = new THREE.MeshBasicMaterial({color:'#fff', transparent:true});
+  const edge = new THREE.Mesh(new THREE.CylinderGeometry(RO + .003, RO + .003, TH * .7, 160, 1, true), ledMat);
+  edge.position.y = TH / 2;
+  const under = new THREE.Mesh(new THREE.RingGeometry(RI + .025, RO - .025, 160), ledMat);
+  under.rotation.x = Math.PI / 2; under.position.y = -0.002;
+  function glowTex(inner, outer) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d'), g = x.createRadialGradient(128, 128, 0, 128, 128, 128);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(inner, 'rgba(255,255,255,0)');
+    g.addColorStop((inner + outer) / 2, 'rgba(255,255,255,1)'); g.addColorStop(outer, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(c);
+  }
+  const haloMat = new THREE.MeshBasicMaterial({map:glowTex(.80, 1), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide});
+  const halo = new THREE.Mesh(new THREE.PlaneGeometry(RO * 2.5, RO * 2.5), haloMat);
+  halo.rotation.x = -Math.PI / 2;
+  led.add(edge, under, halo);
+  scene.add(led);
+  const poolMat = new THREE.MeshBasicMaterial({map:glowTex(.55, .98), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false});
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(RO * 2.9, RO * 2.9), poolMat);
+  pool.rotation.x = -Math.PI / 2; pool.position.y = 0.01;
+  scene.add(pool);
+
+  // truss square above, cables to the 4 suspension points (middle of each quarter)
+  const truss = new THREE.Group();
+  const trussMat = new THREE.MeshStandardMaterial({color:'#2b2f35', metalness:.6, roughness:.5});
+  const S = 2.6;
+  [[0, S, Math.PI / 2], [0, -S, Math.PI / 2], [S, 0, 0], [-S, 0, 0]].forEach(([x, z, r]) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, S * 2 + .3), trussMat);
+    b.position.set(x, TRUSS_Y, z); b.rotation.y = r; truss.add(b);
+  });
+  scene.add(truss);
+  const PTS = [0, 1, 2, 3].map(k => Math.PI / 4 + k * Math.PI / 2);
+  const cableMat = new THREE.LineBasicMaterial({color:'#e9edf1', transparent:true});
+  const cables = PTS.map(a => {
+    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const l = new THREE.Line(g, cableMat); scene.add(l); l.userData.a = a; return l;
+  });
+  const shackles = PTS.map(a => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 12), new THREE.MeshStandardMaterial({color:'#222'}));
+    scene.add(m); m.userData.a = a; return m;
+  });
+
+  // dimension: a line across the ring and a readable label, shown once it is assembled
+  function label(text) {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+    const x = c.getContext('2d');
+    x.fillStyle = 'rgba(27,47,134,.92)'; x.beginPath(); if (x.roundRect) x.roundRect(8, 8, 496, 112, 28); else x.rect(8, 8, 496, 112); x.fill();
+    x.fillStyle = '#fff'; x.font = '700 60px Assistant, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(text, 256, 66);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthTest:false}));
+    sp.scale.set(1.9, .475, 1); sp.renderOrder = 10; return sp;
+  }
+  const dim = new THREE.Group();
+  const dimLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-RO, 0, 0), new THREE.Vector3(RO, 0, 0)]),
+    new THREE.LineDashedMaterial({color:'#ffd34d', dashSize:.12, gapSize:.08, transparent:true}));
+  dimLine.computeLineDistances();
+  const dimLabel = label('12 ft  (3.66 m)'); dimLabel.position.y = .45;
+  dim.add(dimLine, dimLabel); scene.add(dim);
+  const hangLabel = label('4 hanging points'); hangLabel.position.set(0, TRUSS_Y - .9, 0); scene.add(hangLabel);
+
+  // two people for scale (1.75 m)
+  function person(x, z, col) {
+    const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({color:col, roughness:.8});
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(.17, .2, 1.45, 16), m); body.position.y = .73;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.13, 16, 12), m); head.position.y = 1.62;
+    g.add(body, head); g.position.set(x, 0, z); scene.add(g); return g;
+  }
+  person(2.4, 1.0, '#e8784a'); person(-2.3, 1.6, '#4a9fd6');
+
+  // state, eased toward the target every frame
+  const cur = {stack:1, asm:0, lift:0, led:0}, tgt = {...cur};
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function poseQuarter(q, m) {
+    const rot = q * Math.PI / 2, mid = rot + Math.PI / 4;
+    // spread: own angle, pushed out from the centre; stacked: all the same angle, piled up
+    const sx = Math.cos(mid) * 1.1, sz = -Math.sin(mid) * 1.1;
+    const kx = -0.9, kz = 0.9;
+    let x = lerp(sx, kx, cur.stack), z = lerp(sz, kz, cur.stack), y = lerp(0.02, 0.02 + q * TH * 2.2, cur.stack);
+    let r = lerp(rot, 0, cur.stack);
+    x = lerp(x, 0, cur.asm); z = lerp(z, 0, cur.asm);
+    y = lerp(y, 0.02 + cur.lift * HANG_Y, cur.asm);
+    // a little lift while sliding in, so the pieces visibly travel
+    y += Math.sin(Math.min(cur.asm, 1) * Math.PI) * 0.15 * (1 - cur.lift);
+    m.position.set(x, y, z); m.rotation.y = r;
+  }
+  let ledColor = new THREE.Color(COLORS[0]);
+  function apply() {
+    quarters.forEach((m, q) => poseQuarter(q, m));
+    const ringY = 0.02 + cur.lift * HANG_Y;
+    const joined = Math.max(0, (cur.asm - .85) / .15);
+    joints.position.y = ringY; joints.visible = joined > 0.01; plateMat.opacity = joined;
+    led.position.y = ringY; led.visible = cur.led > 0.01;
+    ledMat.color.copy(ledColor).multiplyScalar(0.6 + 0.4 * cur.led); ledMat.opacity = cur.led;
+    haloMat.color.copy(ledColor); haloMat.opacity = cur.led * .55;
+    poolMat.color.copy(ledColor); poolMat.opacity = cur.led * cur.lift * .55; pool.visible = cur.led > .01;
+    hemi.intensity = .9 - .62 * cur.led; sun.intensity = .8 - .65 * cur.led;
+    scene.background.set('#2a323c').lerp(new THREE.Color('#0b0e12'), cur.led);
+    scene.fog.color.copy(scene.background);
+    const show = cur.lift > .03 && cur.asm > .95;
+    dim.position.y = ringY + .02; dim.visible = joined > .5 && cur.led < .5;
+    dimLine.material.opacity = dimLabel.material.opacity = joined;
+    hangLabel.visible = show && cur.led < .5;
+    cables.forEach(l => {
+      const a = l.userData.a, r = (RO + RI) / 2, p = l.geometry.attributes.position;
+      p.setXYZ(0, Math.cos(a) * r, TRUSS_Y - .15, -Math.sin(a) * r);
+      p.setXYZ(1, Math.cos(a) * r, ringY + TH, -Math.sin(a) * r);
+      p.needsUpdate = true; l.visible = show;
+    });
+    shackles.forEach(m => { const a = m.userData.a, r = (RO + RI) / 2;
+      m.position.set(Math.cos(a) * r, ringY + TH + .03, -Math.sin(a) * r); m.visible = joined > .5; });
+  }
+
+  // ---- UI
+  const stepsEl = document.getElementById('steps');
+  let active = 0, timers = [];
+  const btns = STEPS.map((st, i) => {
+    const b = document.createElement('button'); b.textContent = st.name;
+    b.onclick = () => { stop(); go(i); }; stepsEl.appendChild(b); return b;
+  });
+  const play = document.createElement('button'); play.className = 'play'; play.textContent = '▶ Play all';
+  play.onclick = () => { stop(); [0, 1, 2, 3, 4, 5].forEach((k, n) => timers.push(setTimeout(() => go(k), n * 3200))); };
+  stepsEl.appendChild(play);
+  function stop() { timers.forEach(clearTimeout); timers = []; }
+  document.getElementById('prev').onclick = () => { stop(); go(Math.max(0, active - 1)); };
+  document.getElementById('next').onclick = () => { stop(); go(active + 1 < STEPS.length ? active + 1 : 0); };
+  function go(i) {
+    active = i; const st = STEPS[i];
+    btns.forEach((b, k) => b.classList.toggle('on', k === i));
+    cap.textContent = st.cap;
+    document.getElementById('count').textContent = 'Step ' + (i + 1) + ' of ' + STEPS.length;
+    document.getElementById('prog').style.width = ((i + 1) / STEPS.length * 100) + '%';
+    document.getElementById('next').textContent = i + 1 < STEPS.length ? 'Next →' : 'Start again';
+    if (st.strike) {   // lower and switch off first, then take apart
+      Object.assign(tgt, {led:0, lift:0});
+      timers.push(setTimeout(() => Object.assign(tgt, {asm:0}), 1300));
+      timers.push(setTimeout(() => Object.assign(tgt, {stack:1}), 2300));
+    } else Object.assign(tgt, st.s);
+  }
+  const chips = document.getElementById('chips');
+  COLORS.forEach((c, i) => {
+    const b = document.createElement('button'); b.className = 'chip' + (i ? '' : ' on'); b.style.background = c;
+    b.setAttribute('aria-label', 'Colour ' + c);
+    b.onclick = () => { ledColor = new THREE.Color(c); [...chips.children].forEach(x => x.classList.toggle('on', x === b));
+      if (tgt.led < 1) { stop(); go(4); } };
+    chips.appendChild(b);
+  });
+
+  function resize() {
+    const w = view.clientWidth, h = view.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    // distance that fits a 3.4 m radius both across and up/down, so a tall phone sees the whole ring
+    const v = THREE.MathUtils.degToRad(camera.fov) / 2, hz = Math.atan(Math.tan(v) * camera.aspect);
+    const d = 3.4 / Math.tan(Math.min(v, hz)) + 1.5;
+    camera.position.sub(controls.target).setLength(Math.max(8.6, d)).add(controls.target);
+    camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize); resize();
+  renderer.domElement.addEventListener('pointerdown', () => controls.autoRotate = false);
+
+  let last = performance.now();
+  (function loop(t) {
+    const dt = Math.min((t - last) / 1000, .05); last = t;
+    const k = 1 - Math.pow(.035, dt);           // ~1.1 s to settle
+    for (const key in cur) cur[key] = lerp(cur[key], tgt[key], k);
+    apply(); controls.update(); renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  })(last);
+  go(0);
+</script>
+</body></html>
